@@ -5,50 +5,116 @@
  * @format
  * @flow strict-local
  */
-import 'react-native-gesture-handler';
-import React from 'react';
-import { TouchableOpacity, View, Text, ImageBackground }       from 'react-native'
-import { NavigationContainer }      from '@react-navigation/native';
-import { createStackNavigator }     from '@react-navigation/stack'
+import 'react-native-gesture-handler'
+import React, {useEffect} from 'react'
+import { View, ActivityIndicator }  from 'react-native'
 
-import Login    from './src/view/Login';
-import Register from './src/view/Register';
-import { globalStyles } from './src/components/globalStyles'
-import backgroundImage from './src/assets/images/weather3.jpg'
+import { NavigationContainer }      from '@react-navigation/native'
+import { createDrawerNavigator }    from '@react-navigation/drawer'
+import AsyncStorage from '@react-native-community/async-storage'
+
+import { AuthContext }              from './src/components/context'
+import RootStackScreen              from './src/view/RootStack'
+import { DrawerContent }            from './src/view/DrawerContent';
+import TapBottomContent             from './src/view/TapBottomContent'
+
 
 export default () => {
 
-  const Index = ({navigation}) => {
-    return (
-      <View style={globalStyles.container}>
-        <ImageBackground source={backgroundImage} style={globalStyles.imageBackground}>
-          <View style={{ marginTop: 320 }}>
-            <TouchableOpacity 
-              onPress={() => navigation.navigate('Login')} 
-              style={[globalStyles.button, globalStyles.info]}
-              
-            >
-              <Text style={globalStyles.textCenter}>Iniciar Sesión</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={() => navigation.navigate('Register')} 
-              style={[globalStyles.button, globalStyles.info, { marginTop: 8}]}
-            >
-              <Text style={globalStyles.textCenter}>Registrarse</Text>
-            </TouchableOpacity>
-          </View>
-        </ImageBackground>
-      </View>
-    )
+  const Drawer = createDrawerNavigator()
+
+  const initialState = {
+    user: null,
+    isLoading: false
   }
-  const Stack   = createStackNavigator()
+
+
+  const loginReducer = (prevState, action) => {
+    switch( action.type ) {
+      case 'RETRIEVE_TOKEN': 
+        return {
+          ...prevState,
+          user: action.user,
+        };
+      case 'LOGIN': 
+        return {
+          ...prevState,
+          user: action.user,
+        };
+      case 'LOGOUT': 
+        return {
+          ...prevState,
+          user: action.user,
+        };
+      case 'REGISTER': 
+        return {
+          ...prevState,
+          user: action.user,
+        };
+    }
+  };
+
+  const [loginState, dispatch] = React.useReducer(loginReducer, initialState);
+
+  const authContext = React.useMemo(() => ({
+    signIn: async(user) => {      
+      try {
+        await AsyncStorage.setItem('user', user);
+      } catch(e) {
+        console.log(e);
+      }
+      dispatch({ type: 'LOGIN', user });
+    },
+    signOut: async() => {
+      try {
+        await AsyncStorage.removeItem('user');
+      } catch(e) {
+        console.log(e);
+      }
+      dispatch({ type: 'LOGOUT' });
+    },
+    signUp: async (user) => {
+      try {
+        await AsyncStorage.setItem('user', user);
+      } catch(e) {
+        console.log(e);
+      }
+      dispatch({ type: 'REGISTER', user });
+    },
+    }), []);
+
+  useEffect(() => {
+    setTimeout(async() => {
+      let user = null;
+      try {
+        user = await AsyncStorage.getItem('user');
+      } catch(e) {
+        console.log(e);
+      }
+      dispatch({ type: 'RETRIEVE_TOKEN', user });
+    }, 1000);
+  }, []);
+
+  if( loginState.isLoading ) {
+    return(
+      <View style={{flex:1,justifyContent:'center',alignItems:'center'}}>
+        <ActivityIndicator size="large"/>
+      </View>
+    );
+  }
+
   return (
-    <NavigationContainer>
-      <Stack.Navigator headerMode="none">
-        <Stack.Screen component={Index}     name="Index" />
-        <Stack.Screen component={Login}     name="Login" />
-        <Stack.Screen component={Register}  name="Register" />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <AuthContext.Provider value={authContext}>
+      <NavigationContainer>
+        { loginState.user ? (
+            <Drawer.Navigator drawerContent={props => <DrawerContent {...props} />}>
+              <Drawer.Screen name="Home" component={TapBottomContent} />
+            </Drawer.Navigator>
+            )
+          :
+            <RootStackScreen />
+        }
+      </NavigationContainer>
+    </AuthContext.Provider>
   )
 }
